@@ -272,10 +272,8 @@ export const changePassword = asyncHandler(async (req, res, next) => {
  * @UPDATE_USER - Updates the user details (name and avatar)
  */
 export const updateUser = asyncHandler(async (req, res, next) => {
-
   const { fullName } = req.body
   const { id } = req.user
-  console.log(id)
 
   const user = await User.findById(id)
 
@@ -288,9 +286,6 @@ export const updateUser = asyncHandler(async (req, res, next) => {
   }
 
   if (req.file) {
-
-    await cloudinary.v2.uploader.destroy(user.avatar.public_id)
-
     try {
       const result = await cloudinary.v2.uploader.upload(req.file.path, {
         folder: 'lms',
@@ -298,7 +293,6 @@ export const updateUser = asyncHandler(async (req, res, next) => {
         height: 250,
         gravity: 'faces',
         crop: 'fill',
-
       })
       if (result) {
         user.avatar.public_id = result.public_id

@@ -2,6 +2,7 @@ import asyncHandler from '../middlewares/asyncHAndler.middleware.js'
 import User from '../models/usermodel.js'
 import AppError from '../utils/error.util.js'
 import sendEmail from '../utils/sendEmail.js'
+import configManager from '../config/configManager.js'
 
 /**
  * @CONTACT_US
@@ -19,7 +20,7 @@ export const contactUs = asyncHandler(async (req, res, next) => {
     const subject = 'Contact Us Form'
     const textMessage = `${name} - ${email} <br /> ${message}`
 
-    await sendEmail(process.env.CONTACT_US_EMAIL, subject, textMessage)
+    await sendEmail(configManager.get('CONTACT_US_EMAIL'), subject, textMessage)
   } catch (error) {
     console.log(error)
     return next(new AppError(error.message, 400))
