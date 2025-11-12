@@ -4,6 +4,7 @@ const createProxyMiddleware = require(
   'http-proxy-middleware').createProxyMiddleware
 const morgan = require('morgan')
 const errorMiddlware = require('./middlewares/error.middleware.js')
+const { connectRabbitMQ, publishLog } = require('./config/loggingCenterConnect')
 
 require('dotenv').config()
 
@@ -28,37 +29,45 @@ app.use('/configs',
   }),
 )
 
-// // Increase payload size limits
-// app.use(express.json({ limit: '50mb' }))
-// app.use(express.urlencoded({ limit: '50mb', extended: true }))
+process.on('uncaughtException', (error) => {
+  console.error('--- UNCAUGHT EXCEPTION ---')
+  console.error(error)
+  publishLog('fatal', `Uncaught Exception: ${error.stack}`)
+})
 
-app.use(morgan('dev'))
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('--- UNHANDLED REJECTION ---')
+  console.error(reason)
+  publishLog('fatal', `Unhandled Rejection: ${reason.stack || reason}`)
+})
 
-// // Proxy configuration with increased limits
-// const proxyOptions = {
-//   limit: '50mb',
-//   parseReqBody: true,
-// }
+const rabbitMqMorganStream = {
+  write: (message) => {
+    publishLog('info', message.trim())
+  },
+}
+
+app.use(morgan('combined', { stream: rabbitMqMorganStream }))
 
 app.use('/api/v1/course', createProxyMiddleware({
   target: process.env.COURSE_SERVICE_URL,
-  changeOrigin: true
+  changeOrigin: true,
 }))
 app.use('/api/v1/payment', createProxyMiddleware({
   target: process.env.PAYMENT_SERVICE_URL,
-  changeOrigin: true
+  changeOrigin: true,
 
 }))
 
 app.use('/api/v1/user', createProxyMiddleware({
   target: process.env.USER_SERVICE_URL,
-  changeOrigin: true
+  changeOrigin: true,
 
 }))
 
 app.use('/api/v1/', createProxyMiddleware({
   target: process.env.MISC_SERVICE_URL,
-  changeOrigin: true
+  changeOrigin: true,
 }))
 
 app.all(/.*/, (_req, res) => {
@@ -67,6 +76,9 @@ app.all(/.*/, (_req, res) => {
 
 app.use(errorMiddlware)
 
-app.listen(process.env.PORT, () => {
-  console.log(`API Gateway running on port ${process.env.PORT}`)
+connectRabbitMQ().then(() => {
+  app.listen(process.env.PORT, () => {
+    console.log(
+      `User service (producer) listening on http://localhost:${process.env.PORT}`)
+  })
 })

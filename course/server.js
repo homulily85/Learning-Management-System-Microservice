@@ -3,6 +3,7 @@ import connectionToDB from './config/dbConnection.js'
 import app from './app.js'
 import path from 'path'
 import fs from 'fs'
+import { connectRabbitMQ, publishLog } from './config/loggingCenterConnect.js'
 
 const PORT = process.env.PORT
 const CONFIG_FILE = path.join('config.json')
@@ -24,11 +25,14 @@ function loadConfig () {
 fs.watch(CONFIG_FILE, (eventType) => {
   if (eventType === 'change') {
     loadConfig()
+    publishLog('info', '[Config] Configuration reloaded due to file change')
   }
 })
 
 // Load once at startup
 loadConfig()
+
+await connectRabbitMQ()
 
 app.listen(PORT, async () => {
   await connectionToDB()

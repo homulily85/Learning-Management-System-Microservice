@@ -3,6 +3,7 @@ import cloudinary from 'cloudinary'
 import connectionToDB from './config/dbConnection.js'
 import app from './app.js'
 import configManager from './config/configManager.js'
+import { connectRabbitMQ } from './config/loggingCenterConnect.js'
 
 const PORT = process.env.PORT
 
@@ -21,6 +22,8 @@ applyCloudinaryConfig(configManager.get())
 
 // Re-apply when config updates
 configManager.on('update', applyCloudinaryConfig)
+
+await connectRabbitMQ()
 
 app.listen(PORT, async () => {
   await connectionToDB()

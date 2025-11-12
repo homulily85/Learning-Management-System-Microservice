@@ -6,6 +6,7 @@ import morgan from 'morgan'
 
 import errorMiddlware from './middlewares/error.middleware.js'
 import miscRoutes from './routes/miscellanous.routes.js'
+import { publishLog } from './config/loggingCenterConnect.js'
 
 config()
 
@@ -27,7 +28,25 @@ app.use(
 
 app.use(cookieParser())
 
-app.use(morgan('dev'))
+process.on('uncaughtException', (error) => {
+  console.error('--- UNCAUGHT EXCEPTION ---')
+  console.error(error)
+  publishLog('fatal', `Uncaught Exception: ${error.stack}`)
+})
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('--- UNHANDLED REJECTION ---')
+  console.error(reason)
+  publishLog('fatal', `Unhandled Rejection: ${reason.stack || reason}`)
+})
+
+const rabbitMqMorganStream = {
+  write: (message) => {
+    publishLog('info', message.trim())
+  },
+}
+
+app.use(morgan('combined', { stream: rabbitMqMorganStream }))
 
 app.use('/', miscRoutes)
 
