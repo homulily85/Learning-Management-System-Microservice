@@ -5,6 +5,7 @@ const createProxyMiddleware = require(
 const morgan = require('morgan')
 const errorMiddlware = require('./middlewares/error.middleware.js')
 const { connectRabbitMQ, publishLog } = require('./config/loggingCenterConnect')
+const rateLimit = require('express-rate-limit')
 
 require('dotenv').config()
 
@@ -28,6 +29,17 @@ app.use('/configs',
     pathRewrite: { '^/configs': '' },
   }),
 )
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+  message: 'Too many requests from this IP, please try again after 15 minutes.',
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+})
+
+// Apply the rate limiting middleware to all requests
+app.use(limiter)
 
 process.on('uncaughtException', (error) => {
   console.error('--- UNCAUGHT EXCEPTION ---')
@@ -53,6 +65,7 @@ app.use('/api/v1/course', createProxyMiddleware({
   target: process.env.COURSE_SERVICE_URL,
   changeOrigin: true,
 }))
+
 app.use('/api/v1/payment', createProxyMiddleware({
   target: process.env.PAYMENT_SERVICE_URL,
   changeOrigin: true,
