@@ -1,67 +1,58 @@
 import crypto from 'crypto'
-
 import asyncHandler from '../middlewares/asyncHAndler.middleware.js'
 import Payment from '../models/payment.model.js'
 import User from '../models/usermodel.js'
 import AppError from '../utils/error.util.js'
-import { razorpay } from '../server.js'
+// import { razorpay } from '../server.js' // Có thể comment dòng này nếu không muốn lỗi import
 
 /**
  * @ACTIVATE_SUBSCRIPTION
- * Handles the subscription process for the user by creating a new Razorpay
- * subscription.
+ * Giả lập tạo subscription mà không gọi Razorpay
  */
 export const buySubscription = asyncHandler(async (req, res, next) => {
   try {
     const { id } = req.user
     const user = await User.findById(id)
     if (!user) {
-      return next(
-        new AppError('Unauthorize , please login'),
-      )
+      return next(new AppError('Unauthorize , please login'))
     }
     if (user.role === 'ADMIN') {
-      return next(
-        new AppError(' Admin cannot purchase a subscription', 400),
-      )
+      return next(new AppError(' Admin cannot purchase a subscription', 400))
     }
-    if (user.subscription.id && user.subscription.status === 'created') {
-      await user.save()
 
+    // Nếu user đã có subscription rồi
+    if (user.subscription.id && user.subscription.status === 'created') {
       res.status(200).json({
         success: true,
         message: 'subscribed successfully',
         subscription_id: user.subscription.id,
       })
     } else {
-      const subscription = await razorpay.subscriptions.create({
-        plan_id: process.env.RAZORPAY_PLAN_ID,
-        customer_notify: 1,
-        total_count: 12,
-      })
-      user.subscription.id = subscription.id
+      // GIẢ LẬP RAZORPAY RESPONSE
+      const mockSubscription = {
+        id: 'sub_mock_' + Math.random().toString(36).substr(2, 9),
+        status: 'created'
+      }
 
-      user.subscription.status = subscription.status
+      user.subscription.id = mockSubscription.id
+      user.subscription.status = mockSubscription.status
 
       await user.save()
-      console.log(user.subscription.id)
+      
       res.status(200).json({
         success: true,
-        message: 'Subscribed Sucessfully ',
-        subscription_id: subscription.id,
+        message: 'Subscribed Sucessfully (Mocked)',
+        subscription_id: mockSubscription.id,
       })
     }
   } catch (error) {
-    return next(
-      new AppError(error.message, 500),
-    )
+    return next(new AppError(error.message, 500))
   }
-
 })
+
 /**
  * @VERIFY_SUBSCRIPTION
- * Verifies the payment for the subscription by validating the Razorpay payment
- *   signature.
+ * Giả lập xác thực thanh toán thành công
  */
 export const verifySubscription = asyncHandler(async (req, res, next) => {
   try {
@@ -74,160 +65,98 @@ export const verifySubscription = asyncHandler(async (req, res, next) => {
 
     const user = await User.findById(id)
     if (!user) {
-      return next(
-        new AppError('Unauthorize , please login'),
-      )
-    }
-    const subscriptionId = user.subscription.id
-
-    const generateSignature = crypto.createHmac('sha256',
-      process.env.RAZORPAY_SECRET).
-      update(`${razorpay_payment_id}|${subscriptionId}`).
-      digest('hex')
-
-    if (generateSignature !== razorpay_signature) {
-      return next(createError(400, 'payment not verified , please try again'))
+      return next(new AppError('Unauthorize , please login'))
     }
 
+    // BỎ QUA KIỂM TRA CHỮ KÝ (SIGNATURE)
+    // Trong thực tế cần crypto, nhưng ở đây ta cho qua luôn để test
+    
     await Payment.create({
-      razorpay_payment_id,
-      razorpay_signature,
-      razorpay_subscription_id,
+      razorpay_payment_id: razorpay_payment_id || 'pay_mock_' + Date.now(),
+      razorpay_signature: razorpay_signature || 'sig_mock_' + Date.now(),
+      razorpay_subscription_id: razorpay_subscription_id || user.subscription.id,
     })
 
     user.subscription.status = 'active'
-
     await user.save()
+
     res.status(200).json({
       success: true,
-      message: 'Payment verified Sucessfully ',
+      message: 'Payment verified Sucessfully (Mocked)',
     })
   } catch (error) {
-    return next(
-      new AppError(error.message, 500),
-    )
+    return next(new AppError(error.message, 500))
   }
-
 })
+
 /**
  * @CANCEL_SUBSCRIPTION
- * Cancels the user's subscription with Razorpay and updates the user's
- *   subscription status to inactive.
+ * Giả lập hủy subscription
  */
 export const cancelSubscription = asyncHandler(async (req, res, next) => {
-
   try {
     const { id } = req.user
-
     const user = await User.findById(id)
+
     if (!user) {
-      return next(
-        new AppError('Unauthorize , please login'),
-      )
+      return next(new AppError('Unauthorize , please login'))
     }
     if (user.role === 'ADMIN') {
-      return next(
-        new AppError(' Admin cannot purchase a subscription', 400),
-      )
+      return next(new AppError(' Admin cannot purchase a subscription', 400))
     }
 
-    const subscriptionId = user.subscription.id
-    await razorpay.subscriptions.cancel(
-      subscriptionId,
-    )
+    // Bỏ qua bước gọi razorpay.subscriptions.cancel(subscriptionId)
+    
     user.subscription.status = 'Inactive'
-
     await user.save()
 
     res.status(200).json({
       success: true,
-      message: 'UnSubscribed Sucessfully ',
+      message: 'UnSubscribed Sucessfully (Mocked)',
     })
   } catch (error) {
-    return next(
-      new AppError(error.message, 500),
-    )
+    return next(new AppError(error.message, 500))
   }
-
 })
+
 /**
- * @GET_RAZORPAY_ID
- * Fetches and returns the payment records for all subscriptions, with monthly
- *   payment statistics.
+ * @GET_ALL_PAYMENTS
+ * Giả lập lấy danh sách thanh toán để vẽ biểu đồ
  */
 export const allPayments = asyncHandler(async (req, res, next) => {
   try {
-    const { count, skip } = req.query
-
-    const allPayments = await razorpay.subscriptions.all({
-      count: count ? count : 10, // If count is sent then use that else default
-                                 // to 10
-      skip: skip ? skip : 0,
-    })
-
-    const monthNames = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ]
-
-    const finalMonths = {
-      January: 0,
-      February: 0,
-      March: 0,
-      April: 0,
-      May: 0,
-      June: 0,
-      July: 0,
-      August: 0,
-      September: 0,
-      October: 0,
-      November: 0,
-      December: 0,
+    // Thay vì gọi razorpay.subscriptions.all, ta trả về dữ liệu mẫu
+    const mockPayments = {
+      items: [
+        { start_at: Date.now() / 1000 },
+        { start_at: (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000 } // Tháng trước
+      ]
     }
 
-    const monthlyWisePayments = allPayments.items.map((payment) => {
-      // We are using payment.start_at which is in unix time, so we are
-      // converting it to Human readable format using Date()
-      const monthsInNumbers = new Date(payment.start_at * 1000)
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    const finalMonths = { January: 0, February: 0, March: 0, April: 0, May: 0, June: 0, July: 0, August: 0, September: 0, October: 0, November: 0, December: 0 }
 
+    const monthlyWisePayments = mockPayments.items.map((payment) => {
+      const monthsInNumbers = new Date(payment.start_at * 1000)
       return monthNames[monthsInNumbers.getMonth()]
     })
 
     monthlyWisePayments.map((month) => {
-      Object.keys(finalMonths).forEach((objMonth) => {
-        if (month === objMonth) {
-          finalMonths[month] += 1
-        }
-      })
+      if (finalMonths.hasOwnProperty(month)) {
+        finalMonths[month] += 1
+      }
     })
 
-    const monthlySalesRecord = []
-
-    Object.keys(finalMonths).forEach((monthName) => {
-      monthlySalesRecord.push(finalMonths[monthName])
-    })
+    const monthlySalesRecord = Object.values(finalMonths)
 
     res.status(200).json({
       success: true,
-      message: 'All payments',
-      allPayments,
+      message: 'All payments (Mocked)',
+      allPayments: mockPayments,
       finalMonths,
       monthlySalesRecord,
     })
   } catch (error) {
-    return next(
-      new AppError(error.message, 500),
-    )
+    return next(new AppError(error.message, 500))
   }
-
 })
