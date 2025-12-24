@@ -1,19 +1,38 @@
 import cloudinary from 'cloudinary'
-
 import connectionToDB from './config/dbConnection.js'
 import app from './app.js'
+import path from 'path'
+import fs from 'fs'
+import { connectRabbitMQ, publishLog } from './config/loggingCenterConnect.js'
 
-const PORT = process.env.PORT || 5000
+const PORT = process.env.PORT
+const CONFIG_FILE = path.join('config.json')
 
-/**
- * @Cloudinary configuration for file storage service
- */
-cloudinary.v2.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: process.env.CLOUDINARY_SECURE,
+function loadConfig () {
+  try {
+    const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'))
+    cloudinary.v2.config({
+      cloud_name: config.CLOUDINARY_CLOUD_NAME,
+      api_key: config.CLOUDINARY_API_KEY,
+      api_secret: config.CLOUDINARY_API_SECRET,
+    })
+  } catch (err) {
+    console.error('[Config] Failed to read config file:', err.message)
+  }
+}
+
+// --- Watch for config changes ---
+fs.watch(CONFIG_FILE, (eventType) => {
+  if (eventType === 'change') {
+    loadConfig()
+    publishLog('info', '[Config] Configuration reloaded due to file change')
+  }
 })
+
+// Load once at startup
+loadConfig()
+
+await connectRabbitMQ()
 
 app.listen(PORT, async () => {
   await connectionToDB()

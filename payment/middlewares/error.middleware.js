@@ -5,6 +5,7 @@
  *   development purposes (can be removed in production).
  */
 const errorMiddlware = (err, req, res, next) => {
+  publishLog("error", `${err.message}\n${err.stack}`)
   err.statusCode = err.statusCode || 500
   err.massge = err.massge || 'Something went wrong'
   res.status(err.statusCode).json({

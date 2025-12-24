@@ -269,10 +269,11 @@ export const changePassword = asyncHandler(async (req, res, next) => {
  * @UPDATE_USER - Cập nhật thông tin và Avatar
  */
 export const updateUser = asyncHandler(async (req, res, next) => {
-  const { fullName } = req.body;
-  const { id } = req.user;
+  const { fullName } = req.body
+  const { id } = req.user
 
-  const user = await User.findById(id);
+  const user = await User.findById(id)
+
   if (!user) {
     return next(new AppError('User does not exist', 404));
   }
@@ -282,10 +283,6 @@ export const updateUser = asyncHandler(async (req, res, next) => {
   }
 
   if (req.file) {
-    if (user.avatar.public_id && !user.avatar.public_id.includes('avatar_drzgxv')) {
-      await cloudinary.v2.uploader.destroy(user.avatar.public_id);
-    }
-
     try {
       const result = await cloudinary.v2.uploader.upload(req.file.path, {
         folder: 'lms',
@@ -293,8 +290,7 @@ export const updateUser = asyncHandler(async (req, res, next) => {
         height: 250,
         gravity: 'faces',
         crop: 'fill',
-      });
-
+      })
       if (result) {
         user.avatar.public_id = result.public_id;
         user.avatar.secure_url = result.secure_url;

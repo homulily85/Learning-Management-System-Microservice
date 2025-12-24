@@ -6,6 +6,8 @@ const NodeCache = require('node-cache');
 const cluster = require('cluster');
 const os = require('os');
 const { v4: uuidv4 } = require('uuid'); 
+const rateLimit = require('express-rate-limit')
+const { connectRabbitMQ, publishLog } = require('./config/loggingCenterConnect')
 require('dotenv').config();
 
 
@@ -16,7 +18,7 @@ const statusMonitor = require('express-status-monitor')({
 const numCPUs = os.cpus().length;
 
 if (cluster.isMaster) {
-    console.log(`🚀 Master ${process.pid} đang chạy. Đang tạo ${numCPUs} bản sao (Workers)...`);
+    console.log(`Master ${process.pid} đang chạy. Đang tạo ${numCPUs} bản sao (Workers)...`);
 
     for (let i = 0; i < numCPUs; i++) {
         cluster.fork();
@@ -45,7 +47,17 @@ if (cluster.isMaster) {
         origin: process.env.FRONTEND_URL,
         credentials: true,
     }));
+  
+    const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 250, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+    message: 'Too many requests from this IP, please try again after 15 minutes.',
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  })
 
+    app.use(limiter)
+    
     const proxyOptionsWithCache = {
         limit: '50mb',
         proxyReqOptDecorator: function(proxyReqOpts, srcReq) {
@@ -78,10 +90,20 @@ if (cluster.isMaster) {
         return url;
     };
 
-    // API Course: Có Caching
+    process.on('uncaughtException', (error) => {
+    console.error('--- UNCAUGHT EXCEPTION ---')
+    console.error(error)
+    publishLog('fatal', `Uncaught Exception: ${error.stack}`)
+  })
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('--- UNHANDLED REJECTION ---')
+    console.error(reason)
+    publishLog('fatal', `Unhandled Rejection: ${reason.stack || reason}`)
+  })
+  
     app.use('/api/v1/course', checkCache, httpProxy(process.env.COURSE_SERVICE_URL, proxyOptionsWithCache));
 
-    // API User: Có Load Balancing 
     app.use('/api/v1/user', (req, res, next) => {
         const target = getNextUserUrl();
         httpProxy(target, {
@@ -106,4 +128,11 @@ if (cluster.isMaster) {
     app.listen(process.env.PORT, () => {
         console.log(`Worker ${process.pid} started - Monitor: http://localhost:${process.env.PORT}/status`);
     });
+  
+    connectRabbitMQ().then(() => {
+    app.listen(process.env.PORT, () => {
+      console.log(
+        `User service (producer) listening on http://localhost:${process.env.PORT}`)
+    })
+  }) 
 }
