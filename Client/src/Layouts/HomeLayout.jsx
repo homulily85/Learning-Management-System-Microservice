@@ -6,7 +6,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import Footer from '../Compontents/Footer.jsx'
 import { logout } from '../Redux/Slices/AuthSlice.js'
 
-function HomeLayout ({ children }) {
+function HomeLayout({ children }) {
 
   const dispatch = useDispatch()
   const navigate = useNavigate()
@@ -17,12 +17,12 @@ function HomeLayout ({ children }) {
   // for displaying the options acc to role
   const role = useSelector((state) => state?.auth?.role)
 
-  function changeWidth () {
+  function changeWidth() {
     const drawerSide = document.getElementsByClassName('drawer-side')
     drawerSide[0].style.width = 'auto'
   }
 
-  function hideDrawer () {
+  function hideDrawer() {
     const element = document.getElementsByClassName('drawer-toggle')
     element[0].checked = false
 
@@ -30,11 +30,11 @@ function HomeLayout ({ children }) {
     drawerSide[0].style.width = '0'
   }
 
-  async function handleLogout (e) {
+  async function handleLogout(e) {
     e.preventDefault()
 
     const res = await dispatch(logout())
-    if (res?.payload?.sucess) {
+    if (res?.payload?.success) {
       navigate('/')
     }
   }
@@ -42,7 +42,7 @@ function HomeLayout ({ children }) {
   return (
     <div className="min-h-[90vh]">
       <div className="drawer absolute left-0 z-50 w-fit">
-        <input className="drawer-toggle" id="my-drawer" type="checkbox"/>
+        <input className="drawer-toggle" id="my-drawer" type="checkbox" />
         <div className="drawer-content">
           <label htmlFor="my-drawer" className="cursor-pointer relative">
             <FiMenu
@@ -59,7 +59,7 @@ function HomeLayout ({ children }) {
             className="menu p-4 w-48  h-[100%] sm:w-80 bg-base-200 text-base-content relative">
             <li className="w-fit absolute right-2 z-50">
               <button onClick={hideDrawer}>
-                <AiFillCloseCircle size={24}/>
+                <AiFillCloseCircle size={24} />
               </button>
             </li>
             <li>
@@ -89,17 +89,24 @@ function HomeLayout ({ children }) {
             </li>
 
             {!isLoggedIn && (
-              <li className=" absolute bottom-4 w-[90%]">
-                <div
-                  className="w-full flex flex-col items-center justify-center">
-                  <button
-                    className="btn-primary  text-[1rem] bg-blue-500 px-3 py-2 font-semibold rounded-md w-full ">
-                    <Link to="/login">Login</Link>
-                  </button>
-                  <button
-                    className=" btn-secondary text-[1rem] bg-pink-600 px-3 py-2 font-semibold rounded-md w-full ">
-                    <Link to="/signup">Signup</Link>
-                  </button>
+              <li className="absolute bottom-4 w-[90%]">
+                <div className="w-full flex flex-col items-center justify-center gap-2">
+                  {/* Cách tốt nhất: Để Link bọc ngoài hoặc dùng class button trực tiếp vào Link */}
+                  <Link
+                    to="/login"
+                    onClick={hideDrawer} // Đóng drawer khi chuyển sang trang login
+                    className="btn-primary text-center text-[1rem] bg-blue-500 px-3 py-2 font-semibold rounded-md w-full"
+                  >
+                    Login
+                  </Link>
+
+                  <Link
+                    to="/signup"
+                    onClick={hideDrawer} // Đóng drawer khi chuyển sang trang signup
+                    className="btn-secondary text-center text-[1rem] bg-pink-600 px-3 py-2 font-semibold rounded-md w-full"
+                  >
+                    Signup
+                  </Link>
                 </div>
               </li>
             )}
@@ -125,7 +132,7 @@ function HomeLayout ({ children }) {
 
       {children}
 
-      <Footer/>
+      <Footer />
     </div>
   )
 }

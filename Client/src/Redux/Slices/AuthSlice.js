@@ -169,7 +169,7 @@ const authSlice = createSlice({
             localStorage.setItem("role", action?.payload?.user?.role);
             state.data=action?.payload?.user;
             state.role=action?.payload?.user?.role
-            {state.role &&(state.isLoggedIn=true) } 
+            state.isLoggedIn = true;
 
         })
         .addCase(logout.fulfilled, (state)=>{

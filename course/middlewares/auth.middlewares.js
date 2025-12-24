@@ -1,56 +1,61 @@
 import jwt from 'jsonwebtoken'
-
 import User from '../models/usermodel.js'
 import AppError from '../utils/error.util.js'
+import asyncHandler from '../middlewares/asyncHAndler.middleware.js' // Nên dùng cái này để bắt lỗi async
 
 /**
- * @isLoggedIn - Middleware to check if the user is authenticated.
- * Verifies the JWT token from the cookies and attaches the user details to the
- *   request object. If no token is present or invalid, it returns an
- *   "Unauthenticated" error.
+ * @isLoggedIn
  */
-
-const isLoggedIn = async (req, res, next) => {
+export const isLoggedIn = asyncHandler(async (req, res, next) => {
   const { token } = req.cookies
 
   if (!token) {
-    return next(new AppError('Unauthenticated, pls login  again ', 401))
+    return next(new AppError('Unauthenticated, please login again', 401))
   }
 
-  req.user = await jwt.verify(token, process.env.JWT_SECRET)
+  // Giải mã token
+  const userDetails = await jwt.verify(token, process.env.JWT_SECRET)
+  
+  // Gán thông tin user vào request để các middleware sau sử dụng
+  req.user = userDetails
 
   next()
-}
+})
+
 /**
- * @authorizedRoles - Middleware to check if the user has authorized roles.
- * It ensures that the current user has one of the roles required to access the
- *   route.
+ * @authorizedRoles
  */
-const authorizedRoles = (...roles) => async (req, res, next) => {
-  const currentUserRoles = req.user.roles
-  if (roles.includes(currentUserRoles)) {
+export const authorizedRoles = (...roles) => asyncHandler(async (req, res, next) => {
+  const currentUserRole = req.user.role // Model của bạn là 'role' chứ không phải 'roles'
+
+  // Logic ĐÚNG: Nếu role của user KHÔNG nằm trong danh sách roles cho phép
+  if (!roles.includes(currentUserRole)) {
     return next(
-      new AppError('You do not have permission to acess this route', 400),
+      new AppError('You do not have permission to access this route', 403),
     )
   }
   next()
-}
+})
+
 /**
- * @authorizedSubscriber - Middleware to check if the user has an active
- *   subscription. If the user is not an admin and does not have an active
- *   subscription, it returns a "Forbidden" error.
+ * @authorizedSubscriber
  */
-const authorizedSubscriber = async (req, res, next) => {
-  const user = await User.findById(id)
-  const subscription = user.subscription.status
-  const currentUserRole = user.role
-  if (currentUserRole !== 'ADMIN' && subscription !== 'active') {
-    return next(createError(403, 'please subscribe to access this'))
+export const authorizedSubscriber = asyncHandler(async (req, res, next) => {
+  // Lấy ID từ req.user (đã được gán ở bước isLoggedIn)
+  const user = await User.findById(req.user.id)
+  
+  if (!user) {
+    return next(new AppError('User not found', 404))
   }
-}
-export {
-  isLoggedIn,
-  authorizedRoles,
-  authorizedSubscriber,
-}
-    
+
+  const subscriptionStatus = user.subscription.status
+  const currentUserRole = user.role
+
+  // Nếu KHÔNG PHẢI admin VÀ gói cước KHÔNG PHẢI active thì mới chặn
+  if (currentUserRole !== 'ADMIN' && subscriptionStatus !== 'active') {
+    return next(new AppError('Please subscribe to access this content', 403))
+  }
+
+  // CỰC KỲ QUAN TRỌNG: Phải có next() ở đây để đi tiếp vào Controller
+  next()
+})
