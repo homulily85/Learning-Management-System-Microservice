@@ -1,3 +1,5 @@
+import { publishLog } from '../config/loggingCenterConnect.js'
+
 /**
  * @errorMiddleware - Global error handling middleware.
  * Catches any errors thrown in the application and formats the response with
