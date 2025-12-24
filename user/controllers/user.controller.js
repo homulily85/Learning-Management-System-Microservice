@@ -7,12 +7,12 @@ import User from '../models/usermodel.js';
 import AppError from '../utils/error.util.js';
 import sendEmail from '../utils/sendEmail.js';
 
-// Cấu hình Cookie quan trọng để không bị lỗi treo/quay vòng trên localhost
+
 const cookieOptions = {
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
   httpOnly: true,
-  secure: false,   // Đổi thành false để trình duyệt nhận cookie từ http://localhost
-  sameSite: 'Lax', // Đổi thành Lax để hoạt động mượt mà trên môi trường dev
+  secure: false,  
+  sameSite: 'Lax', 
 };
 
 /**
@@ -30,7 +30,6 @@ export const register = asyncHandler(async (req, res, next) => {
     return next(new AppError('Email already exists', 409));
   }
 
-  // Tạo user (Mật khẩu sẽ tự động được hash bởi pre('save') trong model)
   const user = await User.create({
     fullName,
     email,
@@ -45,7 +44,6 @@ export const register = asyncHandler(async (req, res, next) => {
     return next(new AppError('User registration failed, please try again', 400));
   }
 
-  // Xử lý upload ảnh lên Cloudinary nếu có file đính kèm
   if (req.file) {
     try {
       const result = await cloudinary.v2.uploader.upload(req.file.path, {
@@ -60,7 +58,6 @@ export const register = asyncHandler(async (req, res, next) => {
         user.avatar.public_id = result.public_id;
         user.avatar.secure_url = result.secure_url;
 
-        // Xóa file tạm trong thư mục uploads sau khi upload thành công
         await fs.unlink(req.file.path);
       }
     } catch (e) {
@@ -71,7 +68,7 @@ export const register = asyncHandler(async (req, res, next) => {
   await user.save();
 
   const token = await user.generateJWTToken();
-  user.password = undefined; // Ẩn mật khẩu trước khi trả về response
+  user.password = undefined; 
 
   res.cookie('token', token, cookieOptions);
 
@@ -111,7 +108,6 @@ export const login = asyncHandler(async (req, res, next) => {
     }
 
     console.log("5. Đang tạo Token JWT...");
-    // KIỂM TRA JWT_SECRET VÀ EXPIRY Ở ĐÂY
     const token = await user.generateJWTToken();
     console.log("6. Đã tạo xong Token!");
 
@@ -126,7 +122,7 @@ export const login = asyncHandler(async (req, res, next) => {
     });
 
   } catch (e) {
-    console.log("❌ LỖI TẠI LOGIN:", e.message);
+    console.log("LỖI TẠI LOGIN:", e.message);
     return next(new AppError(e.message, 500));
   }
 });
@@ -286,7 +282,6 @@ export const updateUser = asyncHandler(async (req, res, next) => {
   }
 
   if (req.file) {
-    // Xóa ảnh cũ trên Cloudinary nếu không phải ảnh mặc định
     if (user.avatar.public_id && !user.avatar.public_id.includes('avatar_drzgxv')) {
       await cloudinary.v2.uploader.destroy(user.avatar.public_id);
     }
